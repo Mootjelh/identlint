@@ -1,16 +1,20 @@
-# A top-level navigation over HTTP/1.1.
+# A top-level navigation.
 #
-# Measured 2026-09-08 against a local server that keeps headers in arrival
-# order, from Chrome 152, Edge 152 and Brave 152 on Windows, each started
-# headless. All three sent this order. sec-gpc is Brave's and the other two
-# do not send it; the check skips any header the request or this file
-# lacks, so the file fits a request without host, connection or sec-gpc
-# just as well.
+# Measured 2026-09-08 from Chrome 152, Edge 152 and Brave 152 on Windows,
+# each started headless, against local servers that keep headers in arrival
+# order: plain HTTP/1.1, HTTP/1.1 over TLS, and HTTP/2 with the HPACK block
+# decoded field by field. All three browsers sent this order on all three.
 #
-# Not measured: HTTP/2, where host and connection are not sent and priority
-# is; any other major; any other platform. A proxy or a HAR export may not
-# keep the order the browser used. Hold a request against this file only
-# when the order it shows is the order that reached the wire.
+# One file covers both protocols because the check skips any header the
+# request or this file lacks: over HTTP/1.1 the browser sends host and
+# connection and no priority, over HTTP/2 it sends priority and no host or
+# connection. Over HTTP/2 the pseudo-headers come first, as
+# :method :authority :scheme :path; this checker does not read them.
+# sec-gpc is Brave's and the other two do not send it.
+#
+# Not measured: any other major, any other platform. A proxy or a HAR export
+# may not keep the order the browser used. Hold a request against this file
+# only when the order it shows is the order that reached the wire.
 host
 connection
 sec-ch-ua
@@ -26,3 +30,4 @@ sec-fetch-user
 sec-fetch-dest
 accept-encoding
 accept-language
+priority

@@ -33,6 +33,25 @@ sec-fetch-dest: image
 referer:
 accept-encoding: gzip, deflate, br, zstd
 accept-language: en-US,en;q=0.7`,
+
+	// A fetch() over HTTP/2 from the same Chrome: the cors request uses the
+	// image's order, with priority last.
+	"chrome 152 fetch h2": `:method: GET
+:authority: 127.0.0.1:18443
+:scheme: https
+:path: /api
+sec-ch-ua-platform: "Windows"
+user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36
+sec-ch-ua: "Chromium";v="152", "Not?A_Brand";v="24", "Google Chrome";v="152"
+sec-ch-ua-mobile: ?0
+accept: */*
+sec-fetch-site: same-origin
+sec-fetch-mode: cors
+sec-fetch-dest: empty
+referer:
+accept-encoding: gzip, deflate, br, zstd
+accept-language: en-US,en;q=0.9
+priority: u=1, i`,
 }
 
 func readOrderFile(t *testing.T, path string) []string {
@@ -58,8 +77,8 @@ func TestTheMeasuredOrdersFitTheMeasuredIdentities(t *testing.T) {
 		blocks map[string]string
 		names  []string
 	}{
-		{"orders/chromium-152-navigation.txt", identities, []string{"chrome 152 windows", "edge 152 windows", "brave 152 windows"}},
-		{"orders/chromium-152-subresource.txt", subresources, []string{"chrome 152 image", "brave 152 image"}},
+		{"orders/chromium-152-navigation.txt", identities, []string{"chrome 152 windows", "edge 152 windows", "brave 152 windows", "brave 152 windows h2"}},
+		{"orders/chromium-152-subresource.txt", subresources, []string{"chrome 152 image", "brave 152 image", "chrome 152 fetch h2"}},
 	}
 	for _, c := range cases {
 		order := readOrderFile(t, c.file)

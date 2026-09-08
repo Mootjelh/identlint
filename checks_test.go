@@ -64,6 +64,27 @@ sec-ch-ua: "Not=A?Brand";v="99", "Brave";v="151", "Chromium";v="151"
 sec-ch-ua-mobile: ?0
 sec-ch-ua-platform: "Windows"
 accept-encoding: gzip, deflate, br, zstd`,
+
+	// The same Brave 152 over HTTP/2, decoded off the frames: no host or
+	// connection, priority last, and the pseudo-headers ahead of it all.
+	"brave 152 windows h2": `:method: GET
+:authority: 127.0.0.1:18443
+:scheme: https
+:path: /brave
+sec-ch-ua: "Chromium";v="152", "Not?A_Brand";v="24", "Brave";v="152"
+sec-ch-ua-mobile: ?0
+sec-ch-ua-platform: "Windows"
+upgrade-insecure-requests: 1
+user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36
+accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8
+sec-gpc: 1
+sec-fetch-site: none
+sec-fetch-mode: navigate
+sec-fetch-user: ?1
+sec-fetch-dest: document
+accept-encoding: gzip, deflate, br, zstd
+accept-language: en-US,en;q=0.5
+priority: u=0, i`,
 }
 
 func has(findings []Finding, check string, sev Severity) bool {
