@@ -1,0 +1,4 @@
+# The built command, anchored to the root: an unanchored pattern would match
+# the cmd/identlint directory too, and the command would never be committed.
+/identlint
+/identlint.exe
