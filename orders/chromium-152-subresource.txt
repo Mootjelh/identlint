@@ -1,0 +1,24 @@
+# An image fetched by a page, sec-fetch-mode no-cors, over HTTP/1.1.
+#
+# Measured 2026-09-08 the same way as chromium-152-navigation.txt: Chrome,
+# Edge and Brave 152 on Windows, headless, a local server keeping arrival
+# order. The client hints move between the two: a navigation sends
+# sec-ch-ua first, a subresource sends sec-ch-ua-platform first with
+# user-agent between it and sec-ch-ua. sec-gpc is Brave's.
+#
+# Not measured: fetch() and XHR, which are sec-fetch-mode cors; scripts and
+# styles; HTTP/2; any other major; any other platform.
+host
+connection
+sec-ch-ua-platform
+user-agent
+sec-ch-ua
+sec-ch-ua-mobile
+accept
+sec-gpc
+sec-fetch-site
+sec-fetch-mode
+sec-fetch-dest
+referer
+accept-encoding
+accept-language
