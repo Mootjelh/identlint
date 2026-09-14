@@ -79,14 +79,23 @@ type UserAgent struct {
 	Platform      Platform
 	PlatformToken string
 
+	// BrandMajor is the version the browser puts beside its own name in
+	// sec-ch-ua, read off its own token. Chrome, Edge and Brave ship in step
+	// with Chromium so it equals Major; Opera versions itself separately, so
+	// its OPR token is a lower number than the Chromium it is built on.
+	BrandMajor int
+
+	// BrandToken names the token BrandMajor came from, for error messages.
+	BrandToken string
+
 	// Mobile is the Mobile token that Chrome for Android sends on phones.
 	Mobile bool
 }
 
 var (
 	chromeToken = regexp.MustCompile(`(HeadlessChrome|Chrome)/(\d+(?:\.\d+)*)`)
-	edgeToken   = regexp.MustCompile(`\bEdg[A-Za-z]*/\d`)
-	operaToken  = regexp.MustCompile(`\bOPR/\d`)
+	edgeToken   = regexp.MustCompile(`\bEdg[A-Za-z]*/(\d+)`)
+	operaToken  = regexp.MustCompile(`\bOPR/(\d+)`)
 	parenToken  = regexp.MustCompile(`^[^(]*\(([^)]*)\)`)
 )
 
@@ -111,11 +120,16 @@ func ParseUserAgent(s string) (UserAgent, bool) {
 	ua.Major = n
 
 	ua.Family = "chrome"
-	switch {
-	case edgeToken.MatchString(s):
-		ua.Family = "edge"
-	case operaToken.MatchString(s):
-		ua.Family = "opera"
+	ua.BrandMajor, ua.BrandToken = ua.Major, "Chrome"
+	switch m := edgeToken.FindStringSubmatch(s); {
+	case m != nil:
+		ua.Family, ua.BrandToken = "edge", "Edge"
+		ua.BrandMajor = majorOr(m[1], ua.Major)
+	default:
+		if m := operaToken.FindStringSubmatch(s); m != nil {
+			ua.Family, ua.BrandToken = "opera", "Opera"
+			ua.BrandMajor = majorOr(m[1], ua.Major)
+		}
 	}
 
 	if p := parenToken.FindStringSubmatch(s); p != nil {
@@ -125,6 +139,15 @@ func ParseUserAgent(s string) (UserAgent, bool) {
 	ua.Mobile = strings.Contains(s, " Mobile")
 
 	return ua, true
+}
+
+// majorOr reads a major version, falling back when it does not fit an int.
+func majorOr(s string, fallback int) int {
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		return fallback
+	}
+	return n
 }
 
 func classifyPlatform(token string) Platform {
@@ -154,7 +177,9 @@ func brandsFor(family string) []string {
 	case "edge":
 		return []string{"Microsoft Edge"}
 	case "opera":
-		return []string{"Opera"}
+		// Opera GX is a separate product with its own brand. Measured on
+		// Opera GX 135; plain Opera's own string is not measured here.
+		return []string{"Opera", "Opera GX"}
 	default:
 		return []string{"Google Chrome", "Brave"}
 	}

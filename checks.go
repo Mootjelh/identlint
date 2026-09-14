@@ -110,7 +110,7 @@ func (c *checker) brandList(name string, list []Brand, ua UserAgent, full bool) 
 		switch {
 		case b.Name == "Chromium":
 			chromium = true
-			c.version(name, b, ua, full)
+			c.version(name, b, ua.Major, "Chrome", full)
 			if full {
 				fullVersion = b.Version
 			}
@@ -121,7 +121,7 @@ func (c *checker) brandList(name string, list []Brand, ua UserAgent, full bool) 
 			}
 		case brand == "":
 			brand = b.Name
-			c.version(name, b, ua, full)
+			c.version(name, b, ua.BrandMajor, ua.BrandToken, full)
 			if full && fullVersion == "" {
 				fullVersion = b.Version
 			}
@@ -148,11 +148,13 @@ func (c *checker) brandList(name string, list []Brand, ua UserAgent, full bool) 
 	}
 }
 
-// version holds one brand's version against the User-Agent's major.
-func (c *checker) version(name string, b Brand, ua UserAgent, full bool) {
+// version holds one brand's version against the version the User-Agent gives
+// for that product. The Chromium entry follows the Chrome token; the browser's
+// own entry follows its own token, and for Opera those are different numbers.
+func (c *checker) version(name string, b Brand, want int, token string, full bool) {
 	if !full {
-		if b.Version != strconv.Itoa(ua.Major) {
-			c.add(name, Error, "%s gives %s version %s while the User-Agent says Chrome %d", name, b.Name, b.Version, ua.Major)
+		if b.Version != strconv.Itoa(want) {
+			c.add(name, Error, "%s gives %s version %s while the User-Agent says %s %d", name, b.Name, b.Version, token, want)
 		}
 		return
 	}
@@ -161,8 +163,8 @@ func (c *checker) version(name string, b Brand, ua UserAgent, full bool) {
 		c.add(name, Error, "%s gives %s version %q, which is not a four-part version", name, b.Name, b.Version)
 		return
 	}
-	if parts[0] != strconv.Itoa(ua.Major) {
-		c.add(name, Error, "%s gives %s version %s while the User-Agent says Chrome %d", name, b.Name, b.Version, ua.Major)
+	if parts[0] != strconv.Itoa(want) {
+		c.add(name, Error, "%s gives %s version %s while the User-Agent says %s %d", name, b.Name, b.Version, token, want)
 	}
 }
 
