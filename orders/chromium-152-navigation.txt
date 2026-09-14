@@ -12,6 +12,11 @@
 # :method :authority :scheme :path; this checker does not read them.
 # sec-gpc is Brave's and the other two do not send it.
 #
+# referer was added 2026-09-15 from Chrome 152 and Edge 153, on a navigation
+# a page started itself: it sits after sec-fetch-dest, the same place the
+# subresource file has it. That navigation carries no sec-fetch-user, which
+# only a user activated one sends, so the two were not seen together.
+#
 # Not measured: any other major, any other platform. A proxy or a HAR export
 # may not keep the order the browser used. Hold a request against this file
 # only when the order it shows is the order that reached the wire.
@@ -28,6 +33,7 @@ sec-fetch-site
 sec-fetch-mode
 sec-fetch-user
 sec-fetch-dest
+referer
 accept-encoding
 accept-language
 priority

@@ -93,6 +93,18 @@ sec-fetch-dest: document
 accept-encoding: gzip, deflate, br, zstd
 accept-language: nl-NL,nl;q=0.9,en-US;q=0.8,en;q=0.7`,
 
+	// Firefox sends no client hint of any kind, and writes the sec-fetch group
+	// as dest, mode, site where Chromium writes site, mode, user, dest.
+	"firefox 155 windows": `user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:155.0) Gecko/20100101 Firefox/155.0
+accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+accept-language: en-US,en;q=0.9
+accept-encoding: gzip, deflate, br, zstd
+upgrade-insecure-requests: 1
+sec-fetch-dest: document
+sec-fetch-mode: navigate
+sec-fetch-site: none
+priority: u=0, i`,
+
 	"brave 148 macos": `user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36
 sec-ch-ua: "Chromium";v="148", "Brave";v="148", "Not/A)Brand";v="99"
 sec-ch-ua-mobile: ?0
@@ -326,14 +338,54 @@ func TestFullVersionListIsHeldToTheSameRules(t *testing.T) {
 }
 
 func TestOtherBrowsersAreLeftAlone(t *testing.T) {
-	firefox := ParseHeaderBlock("user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:148.0) Gecko/20100101 Firefox/148.0")
-	findings := Check(firefox, Options{})
+	safari := ParseHeaderBlock("user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15")
+	findings := Check(safari, Options{})
 	if len(findings) != 1 || findings[0].Severity != Info {
-		t.Errorf("a Firefox User-Agent got:%s", describe(findings))
+		t.Errorf("a Safari User-Agent got:%s", describe(findings))
 	}
 
 	if findings := Check(nil, Options{}); !has(findings, "user-agent", Error) {
 		t.Errorf("no headers at all got:%s", describe(findings))
+	}
+}
+
+// A real Firefox passes, and each Firefox rule fires on one change to it. The
+// unchanged identity is asserted first, so a rule that fires on everything
+// cannot pass here.
+func TestFirefoxRules(t *testing.T) {
+	base := identities["firefox 155 windows"]
+	if findings := Check(ParseHeaderBlock(base), Options{}); len(findings) != 0 {
+		t.Fatalf("a real Firefox request got:%s", describe(findings))
+	}
+
+	cases := []struct {
+		name  string
+		block string
+		check string
+		sev   Severity
+	}{
+		{"a client hint", base + "\nsec-ch-ua: \"Chromium\";v=\"151\"", "sec-ch-ua", Error},
+		{"another client hint", base + "\nsec-ch-ua-platform: \"Windows\"", "sec-ch-ua", Error},
+		{"rv does not match", strings.Replace(base, "rv:155.0", "rv:148.0", 1), "ua-version", Error},
+		{"the minor is not frozen", strings.Replace(base, "Firefox/155.0", "Firefox/155.0.1", 1), "ua-version", Warn},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if findings := Check(ParseHeaderBlock(tc.block), Options{}); !has(findings, tc.check, tc.sev) {
+				t.Errorf("got:%s", describe(findings))
+			}
+		})
+	}
+
+	// A Chromium TLS profile under a Firefox User-Agent, and the other way.
+	// Both majors match the User-Agent on purpose, so only the family can
+	// produce the finding and a version mismatch cannot stand in for it.
+	if findings := Check(ParseHeaderBlock(base), Options{Profile: "chrome_155"}); !has(findings, "profile", Error) {
+		t.Errorf("a chrome profile under Firefox got:%s", describe(findings))
+	}
+	chrome := identities["chrome 152 windows"]
+	if findings := Check(ParseHeaderBlock(chrome), Options{Profile: "firefox_152"}); !has(findings, "profile", Error) {
+		t.Errorf("a firefox profile under Chrome got:%s", describe(findings))
 	}
 }
 

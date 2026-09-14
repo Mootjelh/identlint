@@ -56,9 +56,15 @@ func FuzzParseUserAgent(f *testing.F) {
 			t.Fatalf("%q parsed as version %q with major %d", s, ua.Version, ua.Major)
 		}
 		switch ua.Family {
-		case "chrome", "edge", "opera":
+		case "chrome", "edge", "opera", "firefox":
 		default:
 			t.Fatalf("%q parsed as family %q", s, ua.Family)
+		}
+		if ua.Family == "firefox" && !firefoxToken.MatchString(s) {
+			t.Fatalf("%q parsed as firefox without a Firefox token", s)
+		}
+		if ua.Family != "firefox" && ua.RvVersion != "" {
+			t.Fatalf("%q parsed as family %q and still carries rv %q", s, ua.Family, ua.RvVersion)
 		}
 	})
 }

@@ -61,10 +61,14 @@ const (
 type UserAgent struct {
 	Raw string
 
-	// Family is chrome, edge or opera. Brave sends Chrome's User-Agent
-	// unchanged and only names itself in sec-ch-ua, so it reads as chrome
-	// here.
+	// Family is chrome, edge, opera or firefox. Brave sends Chrome's
+	// User-Agent unchanged and only names itself in sec-ch-ua, so it reads as
+	// chrome here.
 	Family string
+
+	// RvVersion is Firefox's rv: token, which tracks the release. It is empty
+	// on a Chromium User-Agent.
+	RvVersion string
 
 	// Headless is set when the build announces itself as HeadlessChrome.
 	Headless bool
@@ -97,17 +101,21 @@ var (
 	edgeToken   = regexp.MustCompile(`\bEdg[A-Za-z]*/(\d+)`)
 	operaToken  = regexp.MustCompile(`\bOPR/(\d+)`)
 	parenToken  = regexp.MustCompile(`^[^(]*\(([^)]*)\)`)
+
+	firefoxToken = regexp.MustCompile(`\bFirefox/(\d+(?:\.\d+)*)`)
+	geckoToken   = regexp.MustCompile(`\bGecko/\d`)
+	rvToken      = regexp.MustCompile(`\brv:(\d+(?:\.\d+)*)`)
 )
 
-// ParseUserAgent reads a Chromium User-Agent. The second result is false for
-// anything else, including Chrome on iOS, which is WebKit underneath and says
-// CriOS instead.
+// ParseUserAgent reads a Chromium or a Firefox User-Agent, and says which in
+// Family. The second result is false for anything else, including Chrome on
+// iOS, which is WebKit underneath and says CriOS instead.
 func ParseUserAgent(s string) (UserAgent, bool) {
 	ua := UserAgent{Raw: s}
 
 	m := chromeToken.FindStringSubmatch(s)
 	if m == nil {
-		return ua, false
+		return parseFirefox(ua, s)
 	}
 	ua.Headless = m[1] == "HeadlessChrome"
 	ua.Version = m[2]
@@ -138,6 +146,35 @@ func ParseUserAgent(s string) (UserAgent, bool) {
 	ua.Platform = classifyPlatform(ua.PlatformToken)
 	ua.Mobile = strings.Contains(s, " Mobile")
 
+	return ua, true
+}
+
+// parseFirefox reads a Gecko User-Agent. Both the Gecko token and the Firefox
+// token are required, so a Gecko-shaped string from something that is not
+// Firefox is left alone.
+func parseFirefox(ua UserAgent, s string) (UserAgent, bool) {
+	m := firefoxToken.FindStringSubmatch(s)
+	if m == nil || !geckoToken.MatchString(s) {
+		return ua, false
+	}
+	major, _, _ := strings.Cut(m[1], ".")
+	n, err := strconv.Atoi(major)
+	if err != nil {
+		return ua, false
+	}
+
+	ua.Family = "firefox"
+	ua.Version = m[1]
+	ua.Major = n
+	ua.BrandMajor, ua.BrandToken = n, "Firefox"
+	if r := rvToken.FindStringSubmatch(s); r != nil {
+		ua.RvVersion = r[1]
+	}
+	if p := parenToken.FindStringSubmatch(s); p != nil {
+		ua.PlatformToken = p[1]
+	}
+	ua.Platform = classifyPlatform(ua.PlatformToken)
+	ua.Mobile = strings.Contains(s, " Mobile")
 	return ua, true
 }
 

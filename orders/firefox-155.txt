@@ -1,0 +1,34 @@
+# Firefox, both a top level navigation and a request a page makes.
+#
+# Measured 2026-09-15 from Firefox 155.0 on Windows, started headless with a
+# fresh profile, against a local server that keeps headers in arrival order.
+# One file covers both kinds, because the two differ only in which of referer
+# and upgrade-insecure-requests is present and both sit in the same place: a
+# navigation with no referrer sends upgrade-insecure-requests alone, a
+# subresource sends referer alone, and a navigation from a page sends referer
+# first and then upgrade-insecure-requests. The check skips any header the
+# request or this file lacks.
+#
+# Firefox differs from Chromium in three ways worth knowing before holding a
+# request against either file. It sends no sec-ch-ua of any kind. It writes
+# the sec-fetch group as dest, mode, site, where Chromium writes site, mode,
+# user, dest. And over HTTP/1.1 it capitalises every header name it sends,
+# including the sec-fetch ones, where Chromium writes its client hints in
+# lower case.
+#
+# Not measured: sec-fetch-user, which Firefox sends only on a user activated
+# navigation and which a headless run does not produce, so it is left out
+# rather than placed by guess. Also not measured: HTTP/2, any other version,
+# any other platform, and Firefox on Android.
+host
+user-agent
+accept
+accept-language
+accept-encoding
+connection
+referer
+upgrade-insecure-requests
+sec-fetch-dest
+sec-fetch-mode
+sec-fetch-site
+priority

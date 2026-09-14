@@ -23,9 +23,15 @@ func (c *checker) run() {
 		c.add("user-agent", Error, "no User-Agent header")
 		return
 	}
-	ua, chromium := ParseUserAgent(raw)
-	if !chromium {
-		c.add("user-agent", Info, "not a Chromium User-Agent; only the Chromium rules exist and none of them apply")
+	ua, known := ParseUserAgent(raw)
+	if !known {
+		c.add("user-agent", Info, "not a Chromium or Firefox User-Agent; only those rules exist and none of them apply")
+		return
+	}
+	if ua.Family == "firefox" {
+		c.firefox(ua)
+		c.profile(ua)
+		c.order()
 		return
 	}
 
@@ -58,6 +64,36 @@ func (c *checker) userAgent(ua UserAgent) {
 
 	if ua.Headless {
 		c.add("ua-headless", Warn, "User-Agent says HeadlessChrome; a headless build announces itself there and nowhere else")
+	}
+}
+
+// clientHints are the User-Agent client hints. Firefox implements none of
+// them, so a Firefox User-Agent carrying one is two browsers in one request.
+var clientHints = []string{
+	"sec-ch-ua",
+	"sec-ch-ua-mobile",
+	"sec-ch-ua-platform",
+	"sec-ch-ua-platform-version",
+	"sec-ch-ua-full-version-list",
+	"sec-ch-ua-arch",
+	"sec-ch-ua-bitness",
+	"sec-ch-ua-model",
+}
+
+// firefox holds a Gecko User-Agent against what is settled about Firefox: the
+// rv token carries the same version as the Firefox token, the release build
+// freezes the minor at 0, and no client hint is ever sent.
+func (c *checker) firefox(ua UserAgent) {
+	if ua.RvVersion != "" && ua.RvVersion != ua.Version {
+		c.add("ua-version", Error, "User-Agent gives rv:%s and Firefox/%s; Firefox has sent the same version in both since Firefox 4", ua.RvVersion, ua.Version)
+	}
+	if want := fmt.Sprintf("%d.0", ua.Major); ua.Version != want {
+		c.add("ua-version", Warn, "User-Agent says Firefox/%s; a release build says %s and keeps the rest out of the User-Agent", ua.Version, want)
+	}
+	for _, h := range clientHints {
+		if _, ok := c.headers.Get(h); ok {
+			c.add("sec-ch-ua", Error, "%s is set while the User-Agent is Firefox's; Firefox implements no User-Agent client hints and sends none of them", h)
+		}
 	}
 }
 
@@ -260,14 +296,19 @@ func (c *checker) profile(ua UserAgent) {
 	family := m[1]
 	major, _ := strconv.Atoi(m[2])
 
-	switch family {
-	case "chrome", "opera":
+	switch {
+	case ua.Family == "firefox":
+		if family != "firefox" {
+			c.add("profile", Error, "profile %s is a %s fingerprint under a Firefox User-Agent", c.opts.Profile, family)
+			return
+		}
+	case family == "chrome", family == "opera":
 	default:
 		c.add("profile", Error, "profile %s is a %s fingerprint under a Chromium User-Agent", c.opts.Profile, family)
 		return
 	}
 	if major != ua.Major {
-		c.add("profile", Error, "profile %s is Chrome %d while the User-Agent says %d", c.opts.Profile, major, ua.Major)
+		c.add("profile", Error, "profile %s is %s %d while the User-Agent says %d", c.opts.Profile, ua.BrandToken, major, ua.Major)
 	}
 }
 
