@@ -12,7 +12,12 @@
 # priority is HTTP/2 only, and the check skips whichever the request lacks.
 # sec-gpc is Brave's.
 #
-# Not measured: scripts and styles; any other major; any other platform.
+# Re-measured 2026-09-15 across majors: Opera GX on Chromium 151, Chrome 152
+# and Edge 153 send this order character for character. So the 152 in the file
+# name is where it was first measured and not the limit of what it covers.
+#
+# Not measured: scripts and styles; any major below 151 or above 153; any
+# other platform.
 host
 connection
 sec-ch-ua-platform

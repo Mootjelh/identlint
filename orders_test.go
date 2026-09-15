@@ -34,6 +34,18 @@ referer:
 accept-encoding: gzip, deflate, br, zstd
 accept-language: en-US,en;q=0.7`,
 
+	// Firefox fetching the same image. It puts referer where a navigation
+	// puts upgrade-insecure-requests, which is why one file covers both.
+	"firefox 155 image": `user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:155.0) Gecko/20100101 Firefox/155.0
+accept: image/avif,image/webp,image/png,image/svg+xml,image/*;q=0.8,*/*;q=0.5
+accept-language: en-US,en;q=0.9
+accept-encoding: gzip, deflate, br, zstd
+referer:
+sec-fetch-dest: image
+sec-fetch-mode: no-cors
+sec-fetch-site: same-origin
+priority: u=5, i`,
+
 	// A fetch() over HTTP/2 from the same Chrome: the cors request uses the
 	// image's order, with priority last.
 	"chrome 152 fetch h2": `:method: GET
@@ -77,8 +89,10 @@ func TestTheMeasuredOrdersFitTheMeasuredIdentities(t *testing.T) {
 		blocks map[string]string
 		names  []string
 	}{
-		{"orders/chromium-152-navigation.txt", identities, []string{"chrome 152 windows", "edge 152 windows", "brave 152 windows", "brave 152 windows h2"}},
+		{"orders/chromium-152-navigation.txt", identities, []string{"chrome 152 windows", "edge 152 windows", "brave 152 windows", "brave 152 windows h2", "edge 153 windows", "brave 153 windows", "opera gx 135 windows"}},
 		{"orders/chromium-152-subresource.txt", subresources, []string{"chrome 152 image", "brave 152 image", "chrome 152 fetch h2"}},
+		{"orders/firefox-155.txt", identities, []string{"firefox 155 windows"}},
+		{"orders/firefox-155.txt", subresources, []string{"firefox 155 image"}},
 	}
 	for _, c := range cases {
 		order := readOrderFile(t, c.file)
@@ -106,6 +120,21 @@ func TestANavigationDoesNotFitTheSubresourceOrder(t *testing.T) {
 	findings := Check(ParseHeaderBlock(identities["chrome 152 windows"]), Options{Order: order})
 	if !has(findings, "order", Error) {
 		t.Fatal("the two orders do not separate a navigation from a subresource")
+	}
+}
+
+// Firefox and Chromium need separate files: Firefox sends accept-encoding
+// before accept-language and the sec-fetch group in the other direction, so
+// each order rejects the other's request.
+func TestFirefoxAndChromiumOrdersDoNotFitEachOther(t *testing.T) {
+	chromium := readOrderFile(t, "orders/chromium-152-navigation.txt")
+	firefox := readOrderFile(t, "orders/firefox-155.txt")
+
+	if !has(Check(ParseHeaderBlock(identities["firefox 155 windows"]), Options{Order: chromium}), "order", Error) {
+		t.Error("a Firefox navigation fits the Chromium order")
+	}
+	if !has(Check(ParseHeaderBlock(identities["chrome 152 windows"]), Options{Order: firefox}), "order", Error) {
+		t.Error("a Chrome navigation fits the Firefox order")
 	}
 }
 
