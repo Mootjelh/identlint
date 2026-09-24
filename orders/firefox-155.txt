@@ -16,10 +16,18 @@
 # including the sec-fetch ones, where Chromium writes its client hints in
 # lower case.
 #
-# Not measured: sec-fetch-user, which Firefox sends only on a user activated
-# navigation and which a headless run does not produce, so it is left out
-# rather than placed by guess. Also not measured: HTTP/2, any other version,
-# any other platform, and Firefox on Android.
+# Re-measured 2026-09-25 from Firefox 156.0.1, over plain HTTP/1.1 and over
+# HTTP/2 with the HPACK block decoded field by field. Started with the URL on
+# the command line instead of --screenshot, a headless run counts as a user
+# activated navigation and sends sec-fetch-user, after sec-fetch-site on both
+# protocols. Over HTTP/2 the order is the HTTP/1.1 order without host and
+# connection, with te: trailers added last on every request, and the
+# pseudo-headers come as :method :path :authority :scheme, which differs from
+# Chromium and which this checker does not read. The 155 in the file name is
+# where it was first measured.
+#
+# Not measured: any other version, any other platform, and Firefox on
+# Android.
 host
 user-agent
 accept
@@ -31,4 +39,6 @@ upgrade-insecure-requests
 sec-fetch-dest
 sec-fetch-mode
 sec-fetch-site
+sec-fetch-user
 priority
+te

@@ -158,3 +158,82 @@ func indexOf(list []string, s string) int {
 	}
 	return -1
 }
+
+// Firefox 156, measured 2026-09-25 on Windows, headless, started with the URL
+// on the command line: that counts as a user activated navigation, so
+// sec-fetch-user is sent, which --screenshot never produced. Over HTTP/2 it
+// also sends te: trailers, last. The referer named the local server and is
+// left out.
+var firefox156 = map[string]string{
+	"navigation h1": `user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:156.0) Gecko/20100101 Firefox/156.0
+accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+accept-language: en-US,en;q=0.9
+accept-encoding: gzip, deflate, br, zstd
+connection: keep-alive
+upgrade-insecure-requests: 1
+sec-fetch-dest: document
+sec-fetch-mode: navigate
+sec-fetch-site: none
+sec-fetch-user: ?1
+priority: u=0, i`,
+
+	"navigation h2": `:method: GET
+:path: /
+:authority: 127.0.0.1:8443
+:scheme: https
+user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:156.0) Gecko/20100101 Firefox/156.0
+accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+accept-language: en-US,en;q=0.9
+accept-encoding: gzip, deflate, br, zstd
+upgrade-insecure-requests: 1
+sec-fetch-dest: document
+sec-fetch-mode: navigate
+sec-fetch-site: none
+sec-fetch-user: ?1
+priority: u=0, i
+te: trailers`,
+
+	"image h2": `:method: GET
+:path: /i.png
+:authority: 127.0.0.1:8443
+:scheme: https
+user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:156.0) Gecko/20100101 Firefox/156.0
+accept: image/avif,image/webp,image/png,image/svg+xml,image/*;q=0.8,*/*;q=0.5
+accept-language: en-US,en;q=0.9
+accept-encoding: gzip, deflate, br, zstd
+referer:
+sec-fetch-dest: image
+sec-fetch-mode: no-cors
+sec-fetch-site: same-origin
+priority: u=4, i
+te: trailers`,
+}
+
+// The Firefox file has to place the two headers only the 156 measurement
+// saw. Moving either one somewhere Firefox does not send it has to be caught;
+// a file that lacks the name skips it, so this fails on such a file.
+func TestTheFirefoxOrderPlacesSecFetchUserAndTE(t *testing.T) {
+	order := readOrderFile(t, "orders/firefox-155.txt")
+	for name, block := range firefox156 {
+		if f := Check(ParseHeaderBlock(block), Options{Order: order}); has(f, "order", Error) {
+			t.Errorf("firefox 156 %s:%s", name, describe(f))
+		}
+	}
+
+	moved := map[string]string{
+		"sec-fetch-user before sec-fetch-dest": strings.Replace(
+			strings.Replace(firefox156["navigation h1"], "sec-fetch-user: ?1\n", "", 1),
+			"sec-fetch-dest:", "sec-fetch-user: ?1\nsec-fetch-dest:", 1),
+		"te before user-agent": strings.Replace(
+			strings.Replace(firefox156["navigation h2"], "\nte: trailers", "", 1),
+			"user-agent:", "te: trailers\nuser-agent:", 1),
+	}
+	for name, block := range moved {
+		if block == firefox156["navigation h1"] || block == firefox156["navigation h2"] {
+			t.Fatalf("%s: the edit did not change the block", name)
+		}
+		if !has(Check(ParseHeaderBlock(block), Options{Order: order}), "order", Error) {
+			t.Errorf("%s reports nothing", name)
+		}
+	}
+}
