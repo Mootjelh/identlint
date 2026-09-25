@@ -93,6 +93,22 @@ sec-fetch-dest: document
 accept-encoding: gzip, deflate, br, zstd
 accept-language: nl-NL,nl;q=0.9,en-US;q=0.8,en;q=0.7`,
 
+	// Opera GX 136 on Chromium 152, measured 2026-09-25. A different major
+	// from the 135 above, so a different arbitrary brand and a different
+	// placement, and still its own version beside Chromium's.
+	"opera gx 136 windows": `sec-ch-ua: "Chromium";v="152", "Not?A_Brand";v="24", "Opera GX";v="136"
+sec-ch-ua-mobile: ?0
+sec-ch-ua-platform: "Windows"
+upgrade-insecure-requests: 1
+user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36 OPR/136.0.0.0
+accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+sec-fetch-site: none
+sec-fetch-mode: navigate
+sec-fetch-user: ?1
+sec-fetch-dest: document
+accept-encoding: gzip, deflate, br, zstd
+accept-language: nl-NL,nl;q=0.9,en-US;q=0.8,en;q=0.7`,
+
 	// Firefox sends no client hint of any kind, and writes the sec-fetch group
 	// as dest, mode, site where Chromium writes site, mode, user, dest.
 	"firefox 155 windows": `user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:155.0) Gecko/20100101 Firefox/155.0

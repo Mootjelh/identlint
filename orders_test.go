@@ -89,7 +89,7 @@ func TestTheMeasuredOrdersFitTheMeasuredIdentities(t *testing.T) {
 		blocks map[string]string
 		names  []string
 	}{
-		{"orders/chromium-152-navigation.txt", identities, []string{"chrome 152 windows", "edge 152 windows", "brave 152 windows", "brave 152 windows h2", "edge 153 windows", "brave 153 windows", "opera gx 135 windows"}},
+		{"orders/chromium-152-navigation.txt", identities, []string{"chrome 152 windows", "edge 152 windows", "brave 152 windows", "brave 152 windows h2", "edge 153 windows", "brave 153 windows", "opera gx 135 windows", "opera gx 136 windows"}},
 		{"orders/chromium-152-subresource.txt", subresources, []string{"chrome 152 image", "brave 152 image", "chrome 152 fetch h2"}},
 		{"orders/firefox-155.txt", identities, []string{"firefox 155 windows"}},
 		{"orders/firefox-155.txt", subresources, []string{"firefox 155 image"}},
