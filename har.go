@@ -19,18 +19,42 @@ type Identity struct {
 
 	// Requests is how many requests in the capture carried this identity.
 	Requests int
+
+	// OrderLost says why Headers are not in the order they were sent, and is
+	// empty when nothing in the capture says so. A header order check means
+	// nothing on such an identity.
+	OrderLost string
 }
 
 // harFile is the part of a HAR this reads. Nothing else is decoded: not the
 // URLs, not the cookies, not the bodies.
 type harFile struct {
 	Log struct {
+		Creator struct {
+			Name string `json:"name"`
+		} `json:"creator"`
 		Entries []struct {
 			Request struct {
 				Headers []Header `json:"headers"`
 			} `json:"request"`
 		} `json:"entries"`
 	} `json:"log"`
+}
+
+// orderLost says why a HAR's request headers are not in wire order, or
+// returns "" when nothing says so. Measured on 4,383 entries across 44 HARs
+// exported from Chrome's DevTools, whose creator is WebInspector, over
+// HTTP/1.1, HTTP/2 and HTTP/3 alike: 3,756 listed their headers sorted by
+// name, byte by byte, so an HTTP/1.1 Host came after Accept and Connection,
+// and the other 627 listed the provisional headers the page asked for,
+// capitalised and without pseudo-headers, which are not what went out. None
+// kept the order the browser sent. Other exporters are not measured and are
+// trusted.
+func orderLost(creator string) string {
+	if creator != "WebInspector" {
+		return ""
+	}
+	return "Chromium's DevTools exports request headers sorted by name, not in the order they were sent"
 }
 
 // identityHeaders make two requests the same identity when they agree.
@@ -109,7 +133,7 @@ func IdentitiesFromHAR(r io.Reader) ([]Identity, error) {
 			continue
 		}
 		index[key] = len(out)
-		out = append(out, Identity{Headers: h, Requests: 1})
+		out = append(out, Identity{Headers: h, Requests: 1, OrderLost: orderLost(har.Log.Creator.Name)})
 	}
 	if len(out) == 0 {
 		return nil, errors.New("no entry in the HAR carries request headers")

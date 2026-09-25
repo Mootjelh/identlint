@@ -139,3 +139,55 @@ func TestJSONOutput(t *testing.T) {
 		t.Errorf("a clean block printed:\n%s", stdout.String())
 	}
 }
+
+// A navigation as Chromium's DevTools exports it: the headers sorted by name,
+// which puts user-agent after sec-fetch-mode.
+const devtoolsHAR = `{"log":{"creator":{"name":"%s"},"entries":[
+ {"request":{"httpVersion":"%s","url":"https://example.test/?SECRET","headers":[
+   {"name":":authority","value":"example.test"},
+   {"name":":method","value":"GET"},
+   {"name":":path","value":"/?SECRET"},
+   {"name":":scheme","value":"https"},
+   {"name":"sec-ch-ua","value":"\"Not=A?Brand\";v=\"99\", \"Brave\";v=\"151\", \"Chromium\";v=\"151\""},
+   {"name":"sec-ch-ua-mobile","value":"?0"},
+   {"name":"sec-ch-ua-platform","value":"\"Windows\""},
+   {"name":"sec-fetch-mode","value":"navigate"},
+   {"name":"user-agent","value":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36"}]}}
+]}}`
+
+// A DevTools export does not keep the order the headers were sent in, on any
+// protocol, so holding it against an order reports a fault the browser never
+// made. The same entries from another exporter are still checked: that is the
+// control that the order check would fire here.
+func TestADevToolsExportIsNotHeldToAnOrder(t *testing.T) {
+	dir := t.TempDir()
+	order := write(t, dir, "order.txt", "user-agent\nsec-fetch-mode\n")
+
+	tests := []struct {
+		creator, version string
+		code             int
+		want             string
+	}{
+		{"WebInspector", "http/2.0", 0, "info  order: not checked: Chromium's DevTools"},
+		{"WebInspector", "h3", 0, "info  order: not checked: Chromium's DevTools"},
+		{"WebInspector", "http/1.1", 0, "info  order: not checked: Chromium's DevTools"},
+		{"mitmproxy", "http/1.1", 1, "error order:"},
+		{"mitmproxy", "http/2.0", 1, "error order:"},
+	}
+	for _, tt := range tests {
+		har := write(t, dir, "capture.har", strings.Replace(strings.Replace(devtoolsHAR, "%s", tt.creator, 1), "%s", tt.version, 1))
+		var stdout, stderr bytes.Buffer
+		code := run([]string{"-order", order, "-har", har}, strings.NewReader(""), &stdout, &stderr)
+		if code != tt.code || !strings.Contains(stdout.String(), tt.want) {
+			t.Errorf("%s %s: exit %d, want %d and %q\n%s%s", tt.creator, tt.version, code, tt.code, tt.want, stdout.String(), stderr.String())
+		}
+	}
+
+	// Without -order there is nothing to skip and nothing to say.
+	har := write(t, dir, "capture.har", strings.Replace(strings.Replace(devtoolsHAR, "%s", "WebInspector", 1), "%s", "http/2.0", 1))
+	var stdout, stderr bytes.Buffer
+	run([]string{"-har", har}, strings.NewReader(""), &stdout, &stderr)
+	if strings.Contains(stdout.String(), "order") {
+		t.Errorf("an order note with no order asked for:\n%s", stdout.String())
+	}
+}

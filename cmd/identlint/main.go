@@ -111,7 +111,14 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	failed := false
 	reports := make([]report, len(identities))
 	for i, id := range identities {
-		findings := identlint.Check(id.Headers, opts)
+		o := opts
+		if o.Order != nil && id.OrderLost != "" {
+			o.Order = nil
+		}
+		findings := identlint.Check(id.Headers, o)
+		if o.Order == nil && opts.Order != nil {
+			findings = append(findings, identlint.Finding{Check: "order", Severity: identlint.Info, Message: "not checked: " + id.OrderLost})
+		}
 		if identlint.Errors(findings) {
 			failed = true
 		}
