@@ -105,9 +105,6 @@ func FuzzIdentitiesFromHAR(f *testing.F) {
 				t.Fatalf("an identity with %d requests", id.Requests)
 			}
 			for _, h := range id.Headers {
-				if strings.HasPrefix(h.Name, ":") {
-					t.Fatalf("the pseudo-header %q survived", h.Name)
-				}
 				if !KeepsValue(h.Name) && h.Value != "" {
 					t.Fatalf("%s kept its value %q", h.Name, h.Value)
 				}

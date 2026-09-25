@@ -138,9 +138,13 @@ func TestIdentitiesFromHARGroupsByUserAgentAndMode(t *testing.T) {
 	}
 
 	// The first request's headers are kept in the order they were sent, and
-	// the pseudo-headers are not among them.
-	if ids[0].Headers[0].Name != "sec-ch-ua" || len(ids[0].Headers) != 13 {
-		t.Errorf("the navigation kept %d headers starting with %s; want 13 starting with sec-ch-ua", len(ids[0].Headers), ids[0].Headers[0].Name)
+	// the pseudo-headers keep their place and lose their values, since :path
+	// is the URL.
+	if ids[0].Headers[0].Name != ":authority" || len(ids[0].Headers) != 17 {
+		t.Errorf("the navigation kept %d headers starting with %s; want 17 starting with :authority", len(ids[0].Headers), ids[0].Headers[0].Name)
+	}
+	if v, _ := ids[0].Headers.Get(":path"); v != "" {
+		t.Errorf(":path kept its value %q", v)
 	}
 }
 

@@ -417,8 +417,8 @@ func TestFindingsComeMostSevereFirst(t *testing.T) {
 }
 
 func TestParseHeaderBlockSkipsWhatIsNotAHeader(t *testing.T) {
-	h := ParseHeaderBlock("GET / HTTP/1.1\n:authority: example\nUser-Agent: x\n\nAccept: */*\r\n")
-	if len(h) != 2 || h[0].Name != "User-Agent" || h[1].Value != "*/*" {
+	h := ParseHeaderBlock("GET / HTTP/1.1\n:authority: example\n:\nUser-Agent: x\n\nAccept: */*\r\n")
+	if len(h) != 3 || h[0].Name != ":authority" || h[0].Value != "example" || h[1].Name != "User-Agent" || h[2].Value != "*/*" {
 		t.Errorf("got %+v", h)
 	}
 }

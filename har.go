@@ -141,11 +141,13 @@ func IdentitiesFromHAR(r io.Reader) ([]Identity, error) {
 	return out, nil
 }
 
-// scrub drops HTTP/2 pseudo-headers and blanks every value that is not kept.
+// scrub blanks every value that is not kept. HTTP/2 pseudo-headers keep
+// their names, since their order is what a check reads, and lose their
+// values, since :path is the URL.
 func scrub(raw []Header) Headers {
 	out := make(Headers, 0, len(raw))
 	for _, h := range raw {
-		if h.Name == "" || strings.HasPrefix(h.Name, ":") {
+		if h.Name == "" || h.Name == ":" {
 			continue
 		}
 		if !KeepsValue(h.Name) {

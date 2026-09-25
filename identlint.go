@@ -49,14 +49,19 @@ func (h Headers) Has(name string) bool {
 }
 
 // ParseHeaderBlock reads headers from text, one per line as Name: value. A
-// request line such as GET / HTTP/1.1 and HTTP/2 pseudo-headers are skipped,
-// so the block DevTools copies or curl -v prints can be pasted as it is.
+// request line such as GET / HTTP/1.1 is skipped, so the block DevTools
+// copies or curl -v prints can be pasted as it is. HTTP/2 pseudo-headers such
+// as :method are kept, in place, under their own names.
 func ParseHeaderBlock(text string) Headers {
 	var out Headers
 	for _, line := range strings.Split(text, "\n") {
 		line = strings.TrimRight(line, "\r")
-		if strings.TrimSpace(line) == "" || strings.HasPrefix(line, ":") {
+		if strings.TrimSpace(line) == "" {
 			continue
+		}
+		prefix := ""
+		if strings.HasPrefix(line, ":") {
+			prefix, line = ":", line[1:]
 		}
 		name, value, ok := strings.Cut(line, ":")
 		if !ok {
@@ -67,7 +72,7 @@ func ParseHeaderBlock(text string) Headers {
 			// "GET / HTTP/1.1" splits on the colon in the version and lands here.
 			continue
 		}
-		out = append(out, Header{Name: name, Value: strings.TrimSpace(value)})
+		out = append(out, Header{Name: prefix + name, Value: strings.TrimSpace(value)})
 	}
 	return out
 }
@@ -114,6 +119,11 @@ type Options struct {
 	// in the order the browser sends them. Nil skips it. There is no built-in
 	// order: the README says what was measured and why that is not a table
 	// yet. ReadOrder reads one from a file.
+	//
+	// Setting it also says the headers are in the order they were sent, so
+	// the HTTP/2 pseudo-headers are then held against the order the declared
+	// browser family sends them in. Without it they are not: DevTools lists
+	// them sorted by name, which happens to be Go's own order too.
 	Order []string
 }
 

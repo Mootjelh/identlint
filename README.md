@@ -41,7 +41,7 @@ go install github.com/Mootjelh/identlint/cmd/identlint@latest
 
 ## Use
 
-Give it a header block, one `Name: value` per line. What DevTools copies with "Copy request headers" and what `curl -v` prints both work as they are; a request line and HTTP/2 pseudo-headers are skipped.
+Give it a header block, one `Name: value` per line. What DevTools copies with "Copy request headers" and what `curl -v` prints both work as they are; a request line is skipped, and HTTP/2 pseudo-headers such as `:method` are read in place.
 
 ```bash
 identlint headers.txt
@@ -91,6 +91,7 @@ The exit status is 0 when no check found an error, 1 when one did, and 2 when th
 | `sec-ch-ua` (Firefox) | error | no client hint of any kind is present. Firefox implements none |
 | `profile` | error, info | with `-profile`: a profile whose family and major match the User-Agent |
 | `order` | error | with `-order`: the relative order of the headers both sides have |
+| `pseudo-order` | error | with `-order`: the HTTP/2 pseudo-headers come before every other header, in the order the declared family sends them. Chromium sends `:method :authority :scheme :path`, Firefox `:method :path :authority :scheme` |
 
 An error cannot have come from the browser the headers claim to be. A warning is very likely wrong with some legitimate way of ending up there; a headless build is the usual one. Info is an observation.
 
@@ -112,7 +113,7 @@ The version thresholds, 101 for the version, 107 and 110 for the platform text a
 
 - Safari, and everything else that is neither Chromium nor Firefox, gets one info line and nothing else.
 - Firefox is checked on what is settled about it, the version tokens and the absence of client hints, and not on brands, since it sends none.
-- No built-in header order. What exists is three files measured on one platform and headless builds: two Chromium ones over HTTP/1.1 and HTTP/2 on majors 151 to 153, and one Firefox one over HTTP/1.1 and HTTP/2 on 155 and 156. That is not enough to ship as a table that fails other people's requests, so the check takes a file and the files say what they cover. The pseudo-headers are not read, so their order is not checked. A proxy or a HAR export may not keep the order the browser used; hold a request against an order only when the order it shows is the order that reached the wire. A HAR exported from Chrome's DevTools never does: across 44 of them and 4,383 requests, over HTTP/1.1, HTTP/2 and HTTP/3, every request listed its headers sorted by name or listed only the provisional headers the page asked for. So `-order` skips an identity from such a HAR and says so in an info line, instead of reporting a swap the browser never made.
+- No built-in header order. What exists is three files measured on one platform and headless builds: two Chromium ones over HTTP/1.1 and HTTP/2 on majors 151 to 153, and one Firefox one over HTTP/1.1 and HTTP/2 on 155 and 156. That is not enough to ship as a table that fails other people's requests, so the check takes a file and the files say what they cover. The pseudo-headers are checked only under `-order`, because asking for an order is what says the headers are in wire order: DevTools lists them as `:authority :method :path :scheme`, sorted by name, and that is also the order Go's own `net/http` sends, measured on Go 1.26, so without that promise a genuine browser pasted from DevTools and a Go client would look the same. A proxy or a HAR export may not keep the order the browser used; hold a request against an order only when the order it shows is the order that reached the wire. A HAR exported from Chrome's DevTools never does: across 44 of them and 4,383 requests, over HTTP/1.1, HTTP/2 and HTTP/3, every request listed its headers sorted by name or listed only the provisional headers the page asked for. So `-order` skips an identity from such a HAR and says so in an info line, instead of reporting a swap the browser never made.
 - Plain Opera's brand name comes from Chromium's source and not from a capture. Opera GX's is measured. The Android platform text comes from the schedule, not from a capture. Chrome on iOS is WebKit and is not read as Chromium.
 - `-profile` reads the name you give it, not the TLS connection. It does not fingerprint anything.
 - `sec-ch-ua-arch`, `-bitness`, `-model`, `-platform-version` and `-wow64` are not checked.

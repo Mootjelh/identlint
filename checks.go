@@ -32,6 +32,7 @@ func (c *checker) run() {
 		c.firefox(ua)
 		c.profile(ua)
 		c.order()
+		c.pseudoOrder(ua)
 		return
 	}
 
@@ -42,6 +43,7 @@ func (c *checker) run() {
 	c.encoding(ua)
 	c.profile(ua)
 	c.order()
+	c.pseudoOrder(ua)
 }
 
 // userAgent holds the User-Agent against the reductions Chrome shipped: the
@@ -336,6 +338,72 @@ func (c *checker) order() {
 		}
 		last, lastName = p, n
 	}
+}
+
+// The order each family sends its HTTP/2 pseudo-headers in, read off the
+// wire: Chrome, Edge and Brave 152, Chrome and Brave 153 and Opera GX on
+// Chromium 152 for the first, Firefox 156 for the second. Go's net/http
+// sends :authority :method :path :scheme, which is neither.
+var pseudoOrders = map[string][]string{
+	"chromium": {":method", ":authority", ":scheme", ":path"},
+	"firefox":  {":method", ":path", ":authority", ":scheme"},
+}
+
+// pseudoOrder holds the pseudo-headers against the order the declared family
+// sends them in, and checks they all come before the first regular header,
+// as HTTP/2 requires. It runs only when an order was asked for, since only
+// then are the headers vouched for as the order they were sent in.
+func (c *checker) pseudoOrder(ua UserAgent) {
+	if c.opts.Order == nil {
+		return
+	}
+	var got []string
+	regular := ""
+	for _, h := range c.headers {
+		if !strings.HasPrefix(h.Name, ":") {
+			if regular == "" {
+				regular = strings.ToLower(h.Name)
+			}
+			continue
+		}
+		n := strings.ToLower(h.Name)
+		if regular != "" {
+			c.add("pseudo-order", Error, "%s comes after %s; HTTP/2 sends every pseudo-header before the first regular header", n, regular)
+			return
+		}
+		got = append(got, n)
+	}
+	if len(got) == 0 {
+		return
+	}
+
+	family := "chromium"
+	if ua.Family == "firefox" {
+		family = "firefox"
+	}
+	want := pseudoOrders[family]
+	var sent []string
+	for _, n := range want {
+		if contains(got, n) {
+			sent = append(sent, n)
+		}
+	}
+	var known []string
+	for _, n := range got {
+		if contains(want, n) {
+			known = append(known, n)
+		}
+	}
+	if strings.Join(known, " ") != strings.Join(sent, " ") {
+		c.add("pseudo-order", Error, "the pseudo-headers come as %s; %s sends %s", strings.Join(got, " "), familyTitle(family), strings.Join(want, " "))
+	}
+}
+
+func familyTitle(family string) string {
+	if family == "firefox" {
+		return "Firefox"
+	}
+	return "Chromium"
 }
 
 func contains(list []string, s string) bool {
