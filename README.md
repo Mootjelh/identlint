@@ -5,6 +5,8 @@
 
 Checks that a request's headers agree with the browser they claim to be.
 
+It holds the User-Agent against the `sec-ch-ua` client hints, Chromium's arbitrary GREASE brand and its place in the list, the platform and mobile hints, `accept-encoding`, a TLS profile name, the header order and the HTTP/2 pseudo-header order. It reads a header block or a whole HAR. Tools such as [ua-hints](https://github.com/Kikobeats/ua-hints) generate client hints for a User-Agent; this one checks a request you already have.
+
 No dependencies.
 
 ## Why

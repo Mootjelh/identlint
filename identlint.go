@@ -11,10 +11,14 @@
 // easy to get wrong by hand and nothing reports it, which is how a client ends
 // up declaring three different Chrome versions on one request.
 //
+// Given a reference order, it also checks the header order and the HTTP/2
+// pseudo-header order, which Chromium, Firefox and Go's net/http each write
+// differently. IdentitiesFromHAR reads the requests out of a HAR.
+//
 // The brand list rules are Chromium's own, from
 // components/embedder_support/user_agent_utils.cc, and were checked against
-// what Chrome, Edge and Brave send on the wire. The README says what was
-// measured and what was not.
+// what Chrome, Edge, Brave and Opera GX send on the wire. The README says what
+// was measured and what was not.
 package identlint
 
 import (
