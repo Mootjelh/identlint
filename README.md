@@ -5,7 +5,7 @@
 
 Checks that a request's headers agree with the browser they claim to be.
 
-It holds the User-Agent against the `sec-ch-ua` client hints, Chromium's arbitrary GREASE brand and its place in the list, the platform and mobile hints, `accept-encoding`, a TLS profile name, the header order and the HTTP/2 pseudo-header order. It reads a header block or a whole HAR. Tools such as [ua-hints](https://github.com/Kikobeats/ua-hints) generate client hints for a User-Agent; this one checks a request you already have.
+It holds the User-Agent against the `sec-ch-ua` client hints, Chromium's arbitrary GREASE brand and its place in the list, the platform and mobile hints, `accept-encoding`, a TLS profile name, the spelling of header names over HTTP/1.1, the header order and the HTTP/2 pseudo-header order. It reads a header block or a whole HAR. Tools such as [ua-hints](https://github.com/Kikobeats/ua-hints) generate client hints for a User-Agent; this one checks a request you already have.
 
 No dependencies.
 
@@ -94,6 +94,7 @@ The exit status is 0 when no check found an error, 1 when one did, and 2 when th
 | `profile` | error, info | with `-profile`: a profile whose family and major match the User-Agent |
 | `order` | error | with `-order`: the relative order of the headers both sides have |
 | `pseudo-order` | error | with `-order`: the HTTP/2 pseudo-headers come before every other header, in the order the declared family sends them. Chromium sends `:method :authority :scheme :path`, Firefox `:method :path :authority :scheme` |
+| `header-case` | error | over HTTP/1.1, the names only the browser can set are spelled the way it writes them: Chromium's client hints in lower case, `Sec-GPC` for Brave, and `Host`, `Connection`, `Accept-Encoding`, `Referer`, `User-Agent` and `Sec-Fetch-*` with capitals. Skipped when no name has a capital, which is HTTP/2 |
 
 An error cannot have come from the browser the headers claim to be. A warning is very likely wrong with some legitimate way of ending up there; a headless build is the usual one. Info is an observation.
 
@@ -107,7 +108,7 @@ The two Chromium order files were re-measured across majors on 2026-09-15: Opera
 
 The Chromium orders under `orders/` were measured on 2026-09-08 from Chrome, Edge and Brave 152 on Windows, each started headless, against local servers that keep headers in arrival order: one plain HTTP/1.1, one HTTP/1.1 over TLS, and one HTTP/2 that decodes the HPACK block field by field. Each browser made a navigation, fetched an image, ran a `fetch()` and asked for the favicon. The three browsers sent the same order everywhere, and Brave adds `sec-gpc` after `accept`. Over HTTP/2 the order is the HTTP/1.1 order without `host` and `connection`, with `priority` added last, and the pseudo-headers come as `:method :authority :scheme :path`. The image, the `fetch()` and the favicon share one order and a navigation has another, which is why there are two files; each file covers both protocols, since a header the request does not carry is skipped.
 
-Two things the same measurement showed that are not checked. Over HTTP/1.1 Chromium writes the client hint names in lower case, `sec-ch-ua`, and every other name with capitals, `User-Agent`; HTTP/2 lower-cases everything, so a check on it would only ever fire on HTTP/1.1. And Brave's `accept-language` carried a different q value in each session, 0.5, 0.7 and 0.8 were seen, so nothing here compares that value.
+Over HTTP/1.1 Chromium writes the client hint names in lower case, `sec-ch-ua`, and every other name it sets with capitals, `User-Agent`, while Go's `net/http` writes `Sec-Ch-Ua`. `header-case` checks that, measured on Chrome, Edge and Brave 153, Opera GX on Chromium 152 and Firefox 156, and it matched all 1,509 raw HTTP/1.1 requests in 44 DevTools captures. It holds only the names a page cannot set: a page may set `Accept` itself, Chromium then keeps the page's spelling, and 22 of 720 `accept` headers in those captures were lower case. One thing the same measurement showed that is not checked: Brave's `accept-language` carried a different q value in each session, 0.5, 0.7 and 0.8 were seen, so nothing here compares that value.
 
 The version thresholds, 101 for the version, 107 and 110 for the platform text and 123 for zstd, are Chromium's published User-Agent reduction schedule and the Chrome 123 release. The five identities above, 148 through 152, all send a reduced User-Agent and zstd.
 

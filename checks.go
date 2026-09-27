@@ -33,6 +33,7 @@ func (c *checker) run() {
 		c.profile(ua)
 		c.order()
 		c.pseudoOrder(ua)
+		c.headerCase(ua)
 		return
 	}
 
@@ -44,6 +45,7 @@ func (c *checker) run() {
 	c.profile(ua)
 	c.order()
 	c.pseudoOrder(ua)
+	c.headerCase(ua)
 }
 
 // userAgent holds the User-Agent against the reductions Chrome shipped: the
@@ -396,6 +398,65 @@ func (c *checker) pseudoOrder(ua UserAgent) {
 	}
 	if strings.Join(known, " ") != strings.Join(sent, " ") {
 		c.add("pseudo-order", Error, "the pseudo-headers come as %s; %s sends %s", strings.Join(got, " "), familyTitle(family), strings.Join(want, " "))
+	}
+}
+
+// wireCase says how a browser spells a header name over HTTP/1.1, for the
+// names only the browser can set: a page may set Accept or Accept-Language
+// itself and Chromium keeps the page's spelling, but not these. It returns ""
+// for any other name. Measured on Chrome, Edge and Brave 153, Opera GX on
+// Chromium 152 and Firefox 156, and against the raw HTTP/1.1 requests in 44
+// DevTools captures, where it matched every one of 1,509.
+func wireCase(name, family string) string {
+	n := strings.ToLower(name)
+	switch {
+	case strings.HasPrefix(n, "sec-ch-"):
+		if family == "firefox" {
+			return "" // Firefox sends none; the sec-ch-ua check says so.
+		}
+		return n
+	case n == "sec-gpc":
+		return "Sec-GPC"
+	case strings.HasPrefix(n, "sec-fetch-"), n == "host", n == "connection",
+		n == "accept-encoding", n == "referer", n == "user-agent":
+		parts := strings.Split(n, "-")
+		for i, p := range parts {
+			if p != "" {
+				parts[i] = strings.ToUpper(p[:1]) + p[1:]
+			}
+		}
+		return strings.Join(parts, "-")
+	}
+	return ""
+}
+
+// headerCase holds the spelling of the names the browser sets itself against
+// how it writes them over HTTP/1.1. A block with no capital in any name is
+// HTTP/2, or carries no spelling at all, and is left alone.
+func (c *checker) headerCase(ua UserAgent) {
+	cased := false
+	for _, h := range c.headers {
+		if strings.ToLower(h.Name) != h.Name {
+			cased = true
+			break
+		}
+	}
+	if !cased {
+		return
+	}
+
+	family := "chromium"
+	if ua.Family == "firefox" {
+		family = "firefox"
+	}
+	var wrong []string
+	for _, h := range c.headers {
+		if want := wireCase(h.Name, family); want != "" && want != h.Name {
+			wrong = append(wrong, fmt.Sprintf("%s as %s", h.Name, want))
+		}
+	}
+	if len(wrong) > 0 {
+		c.add("header-case", Error, "over HTTP/1.1 %s writes %s", familyTitle(family), strings.Join(wrong, ", "))
 	}
 }
 
