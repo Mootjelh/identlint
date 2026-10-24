@@ -41,6 +41,7 @@ func (c *checker) run() {
 	c.brands(ua)
 	c.platform(ua)
 	c.mobile(ua)
+	c.highEntropy(ua)
 	c.encoding(ua)
 	c.profile(ua)
 	c.order()
@@ -250,6 +251,68 @@ func (c *checker) mobile(ua UserAgent) {
 			token = "carries the Mobile token"
 		}
 		c.add("sec-ch-ua-mobile", Error, "sec-ch-ua-mobile is %s while the User-Agent %s", strings.TrimSpace(value), token)
+	}
+}
+
+// highEntropyHints are the hints Chromium sends only after a site asked for
+// them with Accept-CH. Measured on Chrome 155 and Edge 156 on Windows: the
+// first request carries sec-ch-ua, -mobile and -platform and nothing else,
+// and these arrive on the request after the opt-in.
+var highEntropyHints = []string{
+	"sec-ch-ua-arch", "sec-ch-ua-bitness", "sec-ch-ua-model",
+	"sec-ch-ua-platform-version", "sec-ch-ua-wow64",
+}
+
+var windowsPlatformVersion = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
+
+// highEntropy holds the high-entropy hints against each other and against
+// the User-Agent. It only looks at the ones that are present: a request
+// without them is what every first request looks like.
+func (c *checker) highEntropy(ua UserAgent) {
+	var sent []string
+	for _, name := range highEntropyHints {
+		if c.headers.Has(name) {
+			sent = append(sent, name)
+		}
+	}
+	if len(sent) == 0 {
+		return
+	}
+	c.add("high-entropy", Info, "%s present; Chromium sends these only after the site asked for them with Accept-CH, so on a first request to a host they are a tell", strings.Join(sent, ", "))
+
+	str := func(name string) (string, bool) {
+		value, ok := c.headers.Get(name)
+		if !ok {
+			return "", false
+		}
+		got, err := parseString(value)
+		if err != nil {
+			c.add(name, Error, "%s does not parse: %v", name, err)
+			return "", false
+		}
+		return got, true
+	}
+
+	if got, ok := str("sec-ch-ua-arch"); ok && got != "x86" && got != "arm" && got != "" {
+		c.add("sec-ch-ua-arch", Error, "sec-ch-ua-arch is %q; Chromium reports \"x86\" or \"arm\" and puts the width in sec-ch-ua-bitness", got)
+	}
+	if got, ok := str("sec-ch-ua-bitness"); ok && got != "64" && got != "32" && got != "" {
+		c.add("sec-ch-ua-bitness", Error, "sec-ch-ua-bitness is %q; Chromium reports \"64\" or \"32\"", got)
+	}
+	if got, ok := str("sec-ch-ua-model"); ok && got != "" && ua.Platform != Android {
+		c.add("sec-ch-ua-model", Error, "sec-ch-ua-model is %q on %s; only Android has a model, and desktop builds send \"\"", got, ua.Platform)
+	}
+	if got, ok := str("sec-ch-ua-platform-version"); ok && ua.Platform == Windows && !windowsPlatformVersion.MatchString(got) {
+		c.add("sec-ch-ua-platform-version", Error, "sec-ch-ua-platform-version is %q; on Windows Chromium sends three numbers, like \"19.0.0\"", got)
+	}
+	if value, ok := c.headers.Get("sec-ch-ua-wow64"); ok {
+		got, err := parseFlag(value)
+		switch {
+		case err != nil:
+			c.add("sec-ch-ua-wow64", Error, "sec-ch-ua-wow64 does not parse: %v", err)
+		case got && ua.Platform != Windows:
+			c.add("sec-ch-ua-wow64", Error, "sec-ch-ua-wow64 is ?1 on %s; WoW64 only exists on Windows", ua.Platform)
+		}
 	}
 }
 

@@ -5,7 +5,7 @@
 
 Checks that a request's headers agree with the browser they claim to be.
 
-It holds the User-Agent against the `sec-ch-ua` client hints, Chromium's arbitrary GREASE brand and its place in the list, the platform and mobile hints, `accept-encoding`, a TLS profile name, the spelling of header names over HTTP/1.1, the header order and the HTTP/2 pseudo-header order. It reads a header block or a whole HAR. Tools such as [ua-hints](https://github.com/Kikobeats/ua-hints) generate client hints for a User-Agent; this one checks a request you already have.
+It holds the User-Agent against the `sec-ch-ua` client hints, Chromium's arbitrary GREASE brand and its place in the list, the platform and mobile hints, the high-entropy hints, `accept-encoding`, a TLS profile name, the spelling of header names over HTTP/1.1, the header order and the HTTP/2 pseudo-header order. It reads a header block or a whole HAR. Tools such as [ua-hints](https://github.com/Kikobeats/ua-hints) generate client hints for a User-Agent; this one checks a request you already have.
 
 No dependencies.
 
@@ -88,6 +88,11 @@ The exit status is 0 when no check found an error, 1 when one did, and 2 when th
 | `sec-ch-ua-full-version-list` | error | the same rules, with four-part versions |
 | `sec-ch-ua-platform` | error, warn | agrees with the platform the User-Agent names. Missing beside `sec-ch-ua` is a warning |
 | `sec-ch-ua-mobile` | error, warn | agrees with the Mobile token. Missing beside `sec-ch-ua` is a warning |
+| `high-entropy` | info | `sec-ch-ua-arch`, `-bitness`, `-model`, `-platform-version` or `-wow64` is present. Chromium sends them only after the site asked with `Accept-CH`, so on a first request to a host they give the client away |
+| `sec-ch-ua-arch`, `-bitness` | error | `"x86"` or `"arm"`, and `"64"` or `"32"`. Not `"x64"`, which is the two run together |
+| `sec-ch-ua-model` | error | `""` everywhere but Android |
+| `sec-ch-ua-platform-version` | error | three numbers on Windows, like `"19.0.0"`. The `10.0` in the User-Agent is frozen and is not this value |
+| `sec-ch-ua-wow64` | error | parses as `?0` or `?1`, and is never `?1` off Windows |
 | `accept-encoding` | warn, info | zstd is offered from Chrome 123 and not before. Any other difference from `gzip, deflate, br, zstd` is info |
 | `ua-version` (Firefox) | error, warn | `rv:` and the `Firefox/` token carry the same version; a release build freezes the minor at 0 |
 | `sec-ch-ua` (Firefox) | error | no client hint of any kind is present. Firefox implements none |
@@ -110,6 +115,8 @@ The Chromium orders under `orders/` were measured on 2026-09-08 from Chrome, Edg
 
 Over HTTP/1.1 Chromium writes the client hint names in lower case, `sec-ch-ua`, and every other name it sets with capitals, `User-Agent`, while Go's `net/http` writes `Sec-Ch-Ua`. `header-case` checks that, measured on Chrome, Edge and Brave 153, Opera GX on Chromium 152 and Firefox 156, and it matched all 1,509 raw HTTP/1.1 requests in 44 DevTools captures. It holds only the names a page cannot set: a page may set `Accept` itself, Chromium then keeps the page's spelling, and 22 of 720 `accept` headers in those captures were lower case. One thing the same measurement showed that is not checked: Brave's `accept-language` carried a different q value in each session, 0.5, 0.7 and 0.8 were seen, so nothing here compares that value.
 
+The high-entropy hints were measured on 2026-10-25 from Chrome 155 and Edge 156 on Windows 11, started headless with a fresh profile against a local server that answered with `Accept-CH` and `Critical-CH` for all of them. The first request carried `sec-ch-ua`, `-mobile` and `-platform` and nothing else; the retried request and every one after it carried `arch "x86"`, `bitness "64"`, `model ""`, `platform-version "19.0.0"`, `wow64 ?0` and `form-factors "Desktop"`, the same in both browsers.
+
 The version thresholds, 101 for the version, 107 and 110 for the platform text and 123 for zstd, are Chromium's published User-Agent reduction schedule and the Chrome 123 release. The five identities above, 148 through 152, all send a reduced User-Agent and zstd.
 
 ## What is not built in
@@ -119,7 +126,8 @@ The version thresholds, 101 for the version, 107 and 110 for the platform text a
 - No built-in header order. What exists is three files measured on one platform and headless builds: two Chromium ones over HTTP/1.1 and HTTP/2 on majors 151 to 153, and one Firefox one over HTTP/1.1 and HTTP/2 on 155 and 156. That is not enough to ship as a table that fails other people's requests, so the check takes a file and the files say what they cover. The pseudo-headers are checked only under `-order`, because asking for an order is what says the headers are in wire order: DevTools lists them as `:authority :method :path :scheme`, sorted by name, and that is also the order Go's own `net/http` sends, measured on Go 1.26, so without that promise a genuine browser pasted from DevTools and a Go client would look the same. A proxy or a HAR export may not keep the order the browser used; hold a request against an order only when the order it shows is the order that reached the wire. A HAR exported from Chrome's DevTools never does: across 44 of them and 4,383 requests, over HTTP/1.1, HTTP/2 and HTTP/3, every request listed its headers sorted by name or listed only the provisional headers the page asked for. So `-order` skips an identity from such a HAR and says so in an info line, instead of reporting a swap the browser never made.
 - Plain Opera's brand name comes from Chromium's source and not from a capture. Opera GX's is measured. The Android platform text comes from the schedule, not from a capture. Chrome on iOS is WebKit and is not read as Chromium.
 - `-profile` reads the name you give it, not the TLS connection. It does not fingerprint anything.
-- `sec-ch-ua-arch`, `-bitness`, `-model`, `-platform-version` and `-wow64` are not checked.
+- `sec-ch-ua-form-factors` is not checked. Chrome 155 and Edge 156 on Windows send `"Desktop"`; nothing else was measured.
+- The high-entropy checks are about shape and about contradictions with the User-Agent. They do not know which Windows builds exist, and macOS and Linux platform versions are not checked.
 - The full-version-list check holds the major against the User-Agent and nothing more; it does not know which builds exist.
 
 ## Library
