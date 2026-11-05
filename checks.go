@@ -278,7 +278,7 @@ func (c *checker) highEntropy(ua UserAgent) {
 	if len(sent) == 0 {
 		return
 	}
-	c.add("high-entropy", Info, "%s present; Chromium sends these only after the site asked for them with Accept-CH, so on a first request to a host they are a tell", strings.Join(sent, ", "))
+	c.add("high-entropy", Info, "%s present; Chromium sends these only after the site asked for them with Accept-CH, and it remembers that across visits, so they are a tell only on a client that has never been to the site", strings.Join(sent, ", "))
 
 	str := func(name string) (string, bool) {
 		value, ok := c.headers.Get(name)

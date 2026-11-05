@@ -88,7 +88,7 @@ The exit status is 0 when no check found an error, 1 when one did, and 2 when th
 | `sec-ch-ua-full-version-list` | error | the same rules, with four-part versions |
 | `sec-ch-ua-platform` | error, warn | agrees with the platform the User-Agent names. Missing beside `sec-ch-ua` is a warning |
 | `sec-ch-ua-mobile` | error, warn | agrees with the Mobile token. Missing beside `sec-ch-ua` is a warning |
-| `high-entropy` | info | `sec-ch-ua-arch`, `-bitness`, `-model`, `-platform-version` or `-wow64` is present. Chromium sends them only after the site asked with `Accept-CH`, so on a first request to a host they give the client away |
+| `high-entropy` | info | `sec-ch-ua-arch`, `-bitness`, `-model`, `-platform-version` or `-wow64` is present. Chromium sends them only after the site asked with `Accept-CH`, and remembers that across visits, so they give a client away only if it has never been there |
 | `sec-ch-ua-arch`, `-bitness` | error | `"x86"` or `"arm"`, and `"64"` or `"32"`. Not `"x64"`, which is the two run together |
 | `sec-ch-ua-model` | error | `""` everywhere but Android |
 | `sec-ch-ua-platform-version` | error | three numbers on Windows, like `"19.0.0"`. The `10.0` in the User-Agent is frozen and is not this value |
@@ -127,6 +127,7 @@ The version thresholds, 101 for the version, 107 and 110 for the platform text a
 - Plain Opera's brand name comes from Chromium's source and not from a capture. Opera GX's is measured. The Android platform text comes from the schedule, not from a capture. Chrome on iOS is WebKit and is not read as Chromium.
 - `-profile` reads the name you give it, not the TLS connection. It does not fingerprint anything.
 - `sec-ch-ua-form-factors` is not checked. Chrome 155 and Edge 156 on Windows send `"Desktop"`; nothing else was measured.
+- Whether a site asked for the high-entropy hints is not checked against a HAR, on purpose. Across 44 DevTools captures, 9 requests carried them and none of the 9 followed an `Accept-CH` from the same origin in that capture, because Chromium keeps the opt-in from earlier visits. A check on it would have flagged every one of those real browsers.
 - The high-entropy checks are about shape and about contradictions with the User-Agent. They do not know which Windows builds exist, and macOS and Linux platform versions are not checked.
 - The full-version-list check holds the major against the User-Agent and nothing more; it does not know which builds exist.
 
